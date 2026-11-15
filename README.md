@@ -1,4 +1,4 @@
-# 아침 브리핑 (syuka-daily)
+# 아침 브리핑 (morning-briefing)
 
 매일 아침 8시(KST) 다섯 개 채널의 새 소식을 **카드로 넘겨 읽고, 퀴즈로 확인하고, 생각을 적어 두는** 정적 웹앱입니다.
 빌드 도구 없이 HTML/CSS/JS로 동작하고 GitHub Pages에서 그대로 서빙됩니다.
@@ -104,8 +104,8 @@ GitHub Pages, `main` 브랜치 루트(`/`)에서 서빙. `.nojekyll`이 있어 �
 push 후 보통 20~60초 안에 반영됩니다(첫 배포는 몇 분 걸릴 수 있음).
 
 ```bash
-git clone https://github.com/seowookim08/syuka-daily.git
-cd syuka-daily
+git clone https://github.com/seowookim08/morning-briefing.git
+cd morning-briefing
 # ... 수정 ...
 git commit -am "..." && git push
 ```
