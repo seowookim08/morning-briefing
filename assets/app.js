@@ -231,12 +231,20 @@
         (t.key === tab ? 'true' : 'false') + '">' + t.label + '</button>';
     }).join('');
 
+    var numbers = Array.isArray(ep.numbers) ? ep.numbers.filter(function (n) { return n && n.value; }) : [];
+    var numbersHTML = numbers.length ? '<div class="numstrip">' + numbers.map(function (n) {
+      return '<div class="numstrip-item"><div class="numstrip-value">' + esc(n.value) + '</div>' +
+        (n.label ? '<div class="numstrip-label">' + esc(n.label) + '</div>' : '') + '</div>';
+    }).join('') + '</div>' : '';
+
     view.innerHTML = '<section class="reader">' +
       '<a class="back" href="#/">← 브리핑 목록</a>' +
       '<header class="ep-head">' +
         '<div class="ep-meta">' + esc(formatDate(ep.date)) + ' · 슈카월드</div>' +
         '<h1 class="ep-title">' + esc(ep.title) + '</h1>' +
+        (ep.subtitle ? '<p class="ep-subtitle">' + esc(ep.subtitle) + '</p>' : '') +
         (ep.summary ? '<p class="ep-dek">' + esc(ep.summary) + '</p>' : '') +
+        numbersHTML +
         '<div class="ep-actions">' +
           (ep.url ? '<a class="btn btn-yt" href="' + esc(ep.url) + '" target="_blank" rel="noopener">▶ 원문 영상 보기</a>' : '') +
           (state.episodes.length > 1 ? '<button class="btn btn-ghost" type="button" id="switch-btn">지난 브리핑</button>' : '') +
@@ -299,6 +307,7 @@
     if (n > 1) {
       html += '<div class="deck-ui">' +
         '<div class="bar"><i id="bar"></i></div>' +
+        (readPos(ep.id, n) === 0 ? '<div class="swipe-hint" id="swipe-hint">옆으로 넘겨서 다음 카드로 →</div>' : '') +
         '<div class="deck-row">' +
           '<button class="nav-btn" type="button" id="prev" aria-label="이전 카드">←</button>' +
           '<span class="counter" id="counter">1 / ' + n + '</span>' +
@@ -346,6 +355,12 @@
     function paint(i) {
       if (bar) bar.style.width = (((i + 1) / n) * 100) + '%';
       if (counter) counter.textContent = (i + 1) + ' / ' + n;
+      var hint = panel.querySelector('#swipe-hint');
+      if (hint) {
+        if (i > 0) {
+          hint.parentNode.removeChild(hint);
+        }
+      }
       if (dots) {
         Array.prototype.forEach.call(dots.children, function (d, k) {
           if (k === i) d.classList.add('on'); else d.classList.remove('on');
@@ -408,7 +423,10 @@
     }
 
     window.requestAnimationFrame(function () {
+      var prevBehavior = deck.style.scrollBehavior;
+      deck.style.scrollBehavior = 'auto';
       deck.scrollLeft = index * cardWidth();
+      deck.style.scrollBehavior = prevBehavior;
       last = index;
       paint(index);
     });
