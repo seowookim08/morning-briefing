@@ -107,7 +107,7 @@ git add data/episodes.json && git commit -m "briefing: 2026-11-16 (syuka, ai-tec
 
 GitHub Pages, `main` 브랜치 루트(`/`)에서 서빙. `.nojekyll`이 있어 정적 파일이 그대로 올라갑니다.
 push 후 보통 20~60초 안에 반영됩니다(첫 배포는 몇 분 걸릴 수 있음).
-`assets/style.css`·`assets/app.js`를 고쳤을 때는 `index.html`의 `?v=20261115a` 값을 함께 올리면
+`assets/style.css`·`assets/app.js`를 고쳤을 때는 `index.html`의 `?v=20261115b` 값을 함께 올리면
 브라우저·CDN 캐시(10분)를 기다리지 않고 바로 새 파일이 내려갑니다.
 
 ```bash

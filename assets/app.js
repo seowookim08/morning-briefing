@@ -392,10 +392,10 @@
       (card.pullQuote ? '<blockquote class="pull">' + inline(card.pullQuote) + '</blockquote>' : '') +
       sourcesHTML(card) +
       (card.footnote ? '<p class="footnote">' + inline(card.footnote) + '</p>' : '') +
+      (kind === 'x' ? '<div class="card-foot"><span class="foot-x">X 실시간</span></div>' : '') +
       (tags.length ? '<div class="card-tags">' + tags.map(function (t) {
         return '<span class="tag">' + esc(t) + '</span>';
       }).join('') + '</div>' : '') +
-      (kind === 'x' ? '<div class="card-foot"><span class="foot-x">X 실시간</span></div>' : '') +
     '</div></article>';
   }
 
