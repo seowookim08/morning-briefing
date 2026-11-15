@@ -10,6 +10,12 @@ new_episode.json 은 에피소드 객체 하나(또는 그런 객체들의 배�
 briefingDate(이 브리핑이 실리는 날) 중 하나는 있어야 하며,
 briefingDate 가 없으면 date 를 쓴다.
 
+선택 키:
+  shortTitle  화면 상단에 한 줄로 보이는 짧은 이름
+tags        에피소드와 카드 모두 선택. 카드마다 3~4개의 키워드 알약(pill)으로
+            표시되므로 짧은 말로 적는다. 본문 문단의 **이렇게** 표시는
+            굵은 글씨로 렌더링된다(홀수 개면 검증에서 걸린다).
+
 같은 id 가 이미 있으면 덮어쓴다(같은 영상을 다시 정리했을 때).
 channel 은 data/episodes.json 의 channels[].id 중 하나여야 한다.
 """
@@ -29,6 +35,31 @@ REQUIRED = ("id", "channel", "title", "cards")
 def fail(message):
     print(f"error: {message}", file=sys.stderr)
     sys.exit(2)
+
+
+def check_text(value):
+    return isinstance(value, str) and value.strip() == value and value.strip()
+
+
+def check_tags(tags, where):
+    """tags 는 선택 필드다. 있으면 짧은 문자열 배열이어야 한다."""
+    if tags is None:
+        return
+    if not isinstance(tags, list) or not tags:
+        fail(f"{where}.tags must be a non-empty array of strings when present")
+    if len(tags) > 6:
+        fail(f"{where}.tags keeps at most 6 pills (got {len(tags)})")
+    for i, tag in enumerate(tags):
+        if not check_text(tag):
+            fail(f"{where}.tags[{i}] must be a non-empty string")
+        if len(tag) > 18:
+            fail(f"{where}.tags[{i}] is too long for a pill ({len(tag)} chars)")
+
+
+def check_emphasis(value, where):
+    """**굵게** 표시는 짝이 맞아야 한다."""
+    if isinstance(value, str) and value.count("**") % 2:
+        fail(f"{where} has an unclosed ** emphasis marker")
 
 
 def check_episode(ep, channel_ids):
@@ -61,6 +92,14 @@ def check_episode(ep, channel_ids):
             fail(f"cards[{i}] is missing body")
         if not isinstance(card["body"], list):
             fail(f"cards[{i}].body must be an array of paragraphs")
+        check_emphasis(card.get("title"), f"cards[{i}].title")
+        for j, paragraph in enumerate(card["body"]):
+            if not check_text(paragraph):
+                fail(f"cards[{i}].body[{j}] must be a non-empty string")
+            check_emphasis(paragraph, f"cards[{i}].body[{j}]")
+        check_emphasis(card.get("pullQuote"), f"cards[{i}].pullQuote")
+        check_emphasis(card.get("footnote"), f"cards[{i}].footnote")
+        check_tags(card.get("tags"), f"cards[{i}]")
         for j, source in enumerate(card.get("sources") or []):
             if not isinstance(source, dict) or not source.get("url"):
                 fail(f"cards[{i}].sources[{j}] needs a url")
@@ -74,15 +113,25 @@ def check_episode(ep, channel_ids):
             fail(f"quizzes[{i}].answer must be an index into options")
         if q.get("type") not in (None, "choice", "ox"):
             fail(f"quizzes[{i}].type must be 'choice' or 'ox'")
+        check_emphasis(q.get("question"), f"quizzes[{i}].question")
+        check_emphasis(q.get("explanation"), f"quizzes[{i}].explanation")
 
     for i, r in enumerate(ep.get("reflections") or []):
         if not isinstance(r, dict) or not r.get("question"):
             fail(f"reflections[{i}] needs a question")
         if not r.get("id"):
             r["id"] = f"r{i + 1}"
+        check_emphasis(r.get("question"), f"reflections[{i}].question")
+        check_emphasis(r.get("hint"), f"reflections[{i}].hint")
 
     if not isinstance(ep.get("numbers") or [], list):
         fail("episode.numbers must be an array when present")
+
+    check_tags(ep.get("tags"), "episode")
+    if ep.get("shortTitle") is not None and not check_text(ep["shortTitle"]):
+        fail("episode.shortTitle must be a non-empty string when present")
+    for key in ("subtitle", "summary"):
+        check_emphasis(ep.get(key), f"episode.{key}")
 
 
 def main():

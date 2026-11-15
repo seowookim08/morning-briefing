@@ -18,7 +18,7 @@
 
 ```
 index.html              앱 셸 (브랜드 + #topbar + #view)
-assets/style.css        에디토리얼 스타일, 모바일 우선, 라이트/다크
+assets/style.css        블랙 테마 카드 리더 스타일, 모바일 우선
 assets/app.js           날짜·채널 라우팅, 카드 덱, 퀴즈, 메모 (프레임워크 없음)
 data/episodes.json      ★ 모든 콘텐츠. 일일 갱신은 이 파일만 고치면 된다
 scripts/add_episode.py  새 에피소드를 검증하며 추가하는 도우미
@@ -47,14 +47,16 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
       "channel": "syuka",                        // channels[].id
       "briefingDate": "2026-11-15",              // 이 브리핑이 실리는 날 (날짜 바 기준)
       "date": "2026-11-14",                      // 원본 게시일
-      "title": "…", "subtitle": "…", "summary": "…",
+      "title": "…", "shortTitle": "짧은 이름", "subtitle": "…", "summary": "…",
+      "tags": ["키워드", "키워드"],                       // 선택 (에피소드 단위)
       "url": "https://www.youtube.com/watch?v=yagCF3JqwAE",
       "numbers": [ { "value": "−41%", "label": "신규 구인 4년 새" } ],
       "cards": [
         {
           "kicker": "01 · 오늘의 장면",
           "title": "카드 제목",
-          "body": ["문단1", "문단2"],
+          "body": ["문단1", "문단2 — **핵심 구절**은 굵게"],
+          "tags": ["키워드", "키워드", "키워드"],         // 선택, 카드 하단 알약 3~4개
           "pullQuote": "강조 문장",                       // 선택
           "stat": { "value": "500만 원 → 30만 원", "label": "설명" },  // 선택
           "footnote": "각주",                             // 선택
@@ -81,6 +83,9 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
 - `briefingDate`는 날짜 바에서 선택하는 날, `date`는 원본 게시일입니다. `briefingDate`가 없으면 `date`로 채웁니다.
 - 같은 `id`가 다시 들어오면 덮어씁니다. 배열 순서는 `briefingDate`·`date` 내림차순으로 유지합니다.
 - `quizzes`·`reflections`가 없으면 해당 탭에 안내 문구만 나옵니다. 한 채널이라도 콘텐츠가 없는 날은 빈 상태가 표시됩니다.
+- 문체: 본문·퀴즈 해설·생각해 볼 질문은 **친근한 존댓말(해요체)**로 씁니다. 신문체(`~한다`, `~보여 준다`)는 쓰지 않습니다.
+- `body`·`title`·`pullQuote`·`footnote`·퀴즈 `explanation`의 `**구절**`은 굵은 글씨로 렌더링됩니다(HTML은 먼저 이스케이프하므로 안전).
+- `cards[].tags`는 카드 하단 키워드 알약으로 그려집니다. 3~4개, 짧은 말로(18자 이내, 최대 6개까지 검증 통과).
 - 사용자 데이터(읽던 위치, 퀴즈 점수, 메모)는 저장소에 남지 않고 브라우저 `localStorage`에만 저장됩니다.
   키 접두사 `syuka.v1` — `syuka.v1.pos.{episodeId}`, `syuka.v1.quiz.{episodeId}`, `syuka.v1.note.{episodeId}.{질문 id}`.
 

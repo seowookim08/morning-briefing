@@ -32,6 +32,11 @@
     return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return ESC[c]; });
   }
 
+  /* escape first, then turn **강조** into <strong> — safe by construction */
+  function inline(value) {
+    return esc(value).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  }
+
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   function parseISO(iso) {
@@ -304,23 +309,17 @@
     }).join('') + '</nav>' : '';
 
     var action = ep.url
-      ? '<a class="btn ' + (isYT ? 'btn-yt' : 'btn-ghost') + '" href="' + esc(ep.url) + '" target="_blank" rel="noopener">' +
-        (isYT ? '▶ 원문 영상' : '원문 게시물') + '</a>'
+      ? '<a class="ep-link" href="' + esc(ep.url) + '" target="_blank" rel="noopener">' +
+        (isYT ? '원문 영상' : '원문') + ' <span aria-hidden="true">↗</span></a>'
       : '';
 
     view.innerHTML = '<section class="reader">' +
-      '<header class="ep-head">' +
-        '<div class="ep-meta">' +
-          '<span class="ch-badge">' + esc(ch.name) + '</span>' +
-          '<span class="ep-dot"></span>' +
-          '<span>' + esc(formatDate(ep.date)) + (isYT ? '' : ' · ' + (ep.cards || []).length + '개 화제') + '</span>' +
-        '</div>' +
+      '<div class="ep-bar">' +
+        '<span class="ch-badge">' + esc(ch.name) + '</span>' +
         '<h1 class="ep-title">' + esc(ep.title) + '</h1>' +
-        (ep.subtitle ? '<p class="ep-subtitle">' + esc(ep.subtitle) + '</p>' : '') +
-        (ep.summary ? '<p class="ep-dek">' + esc(ep.summary) + '</p>' : '') +
-        numbersHTML +
-        (action ? '<div class="ep-actions">' + action + '</div>' : '') +
-      '</header>' +
+        action +
+      '</div>' +
+      numbersHTML +
       subtabs +
       '<div id="panel"></div>' +
     '</section>';
@@ -370,21 +369,33 @@
 
   function cardHTML(card, i, total, kind) {
     var body = Array.isArray(card.body) ? card.body : [];
-    var bodyHTML = body.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
+    var bodyHTML = body.map(function (p) { return '<p>' + inline(p) + '</p>'; }).join('');
+    var tags = Array.isArray(card.tags)
+      ? card.tags.filter(function (t) { return typeof t === 'string' && t.trim(); })
+      : [];
+    var section = String(card.kicker || '').replace(/^\s*\d+\s*[·.\-]\s*/, '').trim();
+    var pct = Math.round(((i + 1) / total) * 100);
 
     return '<article class="card" data-i="' + i + '"><div class="card-inner">' +
-      (card.kicker ? '<div class="card-kicker">' + esc(card.kicker) + '</div>' : '') +
-      '<h2 class="card-title">' + esc(card.title) + '</h2>' +
+      '<div class="card-progress" aria-hidden="true"><i style="width:' + pct + '%"></i></div>' +
+      '<div class="card-meta">' +
+        '<span class="cm-label">' + esc(section || '읽기') + '</span>' +
+        '<span class="cm-sep">·</span>' +
+        '<span class="cm-count">' + (i + 1) + '/' + total + '</span>' +
+      '</div>' +
+      '<h2 class="card-title">' + inline(card.title) + '</h2>' +
       (bodyHTML ? '<div class="card-body">' + bodyHTML + '</div>' : '') +
-      (card.pullQuote ? '<blockquote class="pull">' + esc(card.pullQuote) + '</blockquote>' : '') +
-      (card.stat && card.stat.value ? '<div class="stat">' +
-        '<div class="stat-value">' + esc(card.stat.value) + '</div>' +
-        (card.stat.label ? '<div class="stat-label">' + esc(card.stat.label) + '</div>' : '') +
+      (card.stat && card.stat.value ? '<div class="card-stat">' +
+        '<span class="stat-value">' + esc(card.stat.value) + '</span>' +
+        (card.stat.label ? '<span class="stat-label">' + esc(card.stat.label) + '</span>' : '') +
       '</div>' : '') +
-      (card.footnote ? '<p class="footnote">' + esc(card.footnote) + '</p>' : '') +
+      (card.pullQuote ? '<blockquote class="pull">' + inline(card.pullQuote) + '</blockquote>' : '') +
       sourcesHTML(card) +
-      '<div class="card-foot"><span>' + pad(i + 1) + ' / ' + pad(total) + '</span>' +
-        (kind === 'x' ? '<span class="foot-x">X 실시간</span>' : '') + '</div>' +
+      (card.footnote ? '<p class="footnote">' + inline(card.footnote) + '</p>' : '') +
+      (tags.length ? '<div class="card-tags">' + tags.map(function (t) {
+        return '<span class="tag">' + esc(t) + '</span>';
+      }).join('') + '</div>' : '') +
+      (kind === 'x' ? '<div class="card-foot"><span class="foot-x">X 실시간</span></div>' : '') +
     '</div></article>';
   }
 
@@ -403,7 +414,6 @@
 
     if (n > 1) {
       html += '<div class="deck-ui">' +
-        '<div class="bar"><i id="bar"></i></div>' +
         (readPos(ep.id, n) === 0 ? '<div class="swipe-hint" id="swipe-hint">옆으로 넘겨서 다음 카드로 →</div>' : '') +
         '<div class="deck-row">' +
           '<button class="nav-btn" type="button" id="prev" aria-label="이전 카드">←</button>' +
@@ -437,7 +447,6 @@
     if (!deck || !wrap) return;
 
     var index = readPos(ep.id, n);
-    var bar = panel.querySelector('#bar');
     var counter = panel.querySelector('#counter');
     var dots = panel.querySelector('#dots');
     var prev = panel.querySelector('#prev');
@@ -451,7 +460,6 @@
     }
 
     function paint(i) {
-      if (bar) bar.style.width = (((i + 1) / n) * 100) + '%';
       if (counter) counter.textContent = (i + 1) + ' / ' + n;
       if (dots) {
         Array.prototype.forEach.call(dots.children, function (d, k) {
@@ -596,7 +604,7 @@
       var fb = panel.querySelector('#fb');
       fb.innerHTML = '<div class="fb ' + (correct ? 'ok' : 'no') + '">' +
         '<div class="fb-head">' + head + '</div>' +
-        (q.explanation ? '<p class="fb-body">' + esc(q.explanation) + '</p>' : '') +
+        (q.explanation ? '<p class="fb-body">' + inline(q.explanation) + '</p>' : '') +
         '<button class="btn btn-primary" type="button" id="next-q">' +
           (idx === qs.length - 1 ? '결과 보기' : '다음 문제') + '</button>' +
       '</div>';
