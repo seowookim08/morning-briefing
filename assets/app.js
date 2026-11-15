@@ -206,7 +206,7 @@
     if (!state.loaded) return;
     var route = parseRoute();
     if (!route) {
-      view.innerHTML = '<div class="state">아직 브리핑이 없습니다.<br>매일 아침 8시에 새 브리핑이 올라옵니다.</div>';
+      view.innerHTML = '<div class="state">아직 브리핑이 없어요.<br>매일 아침 8시에 새 브리핑이 올라와요.</div>';
       topbar.innerHTML = '';
       return;
     }
@@ -345,8 +345,8 @@
       : 'https://x.com/search?q=' + encodeURIComponent(ch.name === '뉴진스' ? '뉴진스' : 'AI') + '&f=live';
     return '<div class="state empty">' +
       '<div class="empty-ch">' + esc(ch.name) + '</div>' +
-      '<p>' + esc(formatDateLong(route.day)) + '에는<br>' + esc(ch.name) + ' 새 브리핑이 없습니다.</p>' +
-      '<p class="empty-sub">새 영상이나 화제가 잡히면 다음 아침 8시에 이 자리에 올라옵니다.</p>' +
+      '<p>' + esc(formatDateLong(route.day)) + '에는<br>' + esc(ch.name) + ' 새 브리핑이 없어요.</p>' +
+      '<p class="empty-sub">새 영상이나 화제가 잡히면 다음 아침 8시에 이 자리에 올라와요.</p>' +
       '<a class="btn btn-ghost" href="' + esc(link) + '" target="_blank" rel="noopener">' +
         (isYT ? '채널 바로 가기' : 'X에서 보기') + '</a>' +
     '</div>';
@@ -404,7 +404,7 @@
     var n = cards.length;
     var kind = (ch && ch.kind) || 'youtube';
     if (!n) {
-      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 카드가 없습니다.</p>';
+      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 카드가 없어요.</p>';
       return;
     }
 
@@ -428,7 +428,7 @@
 
     if (kind === 'youtube') {
       html += '<div class="end-cta">' +
-        '<p>여기까지 읽었습니다. 기억에 남는 숫자 하나를 골라 두면 훨씬 오래 갑니다.</p>' +
+        '<p>여기까지 다 읽었어요. 기억에 남는 숫자 하나만 골라 두면 훨씬 오래 남아요.</p>' +
         '<div class="end-cta-row">' +
           '<button class="btn btn-primary" type="button" id="go-quiz">퀴즈 풀기</button>' +
           '<button class="btn btn-ghost" type="button" id="go-notes">생각 정리하기</button>' +
@@ -551,7 +551,7 @@
   function renderQuiz(ep, panel, sig) {
     var qs = Array.isArray(ep.quizzes) ? ep.quizzes : [];
     if (!qs.length) {
-      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 퀴즈가 없습니다.</p>';
+      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 퀴즈가 없어요.</p>';
       return;
     }
 
@@ -638,10 +638,10 @@
       });
 
       var msg;
-      if (score === qs.length) msg = '완벽합니다. 오늘 브리핑의 숫자를 그대로 붙잡았습니다.';
-      else if (score >= Math.ceil(qs.length * 0.7)) msg = '좋습니다. 핵심은 잡았습니다. 틀린 문제만 다시 보면 됩니다.';
-      else if (score > 0) msg = '절반쯤 왔습니다. 아래 정답을 훑고 한 번 더 풀어 보세요.';
-      else msg = '괜찮습니다. 숫자는 한 번에 외워지지 않습니다. 카드로 돌아가 다시 읽어 보세요.';
+      if (score === qs.length) msg = '완벽해요. 오늘 브리핑의 숫자를 그대로 붙잡았어요.';
+      else if (score >= Math.ceil(qs.length * 0.7)) msg = '좋아요. 핵심은 잡았어요. 틀린 문제만 다시 보면 돼요.';
+      else if (score > 0) msg = '절반쯤 왔어요. 아래 정답을 훑고 한 번 더 풀어 보세요.';
+      else msg = '괜찮아요. 숫자는 한 번에 외워지지 않아요. 카드로 돌아가 다시 읽어 보세요.';
 
       var reviewHTML = wrong.length ? '<div class="review">' + wrong.map(function (w) {
         var o = quizOptions(w.q);
@@ -678,12 +678,12 @@
   function renderNotes(ep, panel, sig) {
     var rs = Array.isArray(ep.reflections) ? ep.reflections : [];
     if (!rs.length) {
-      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 생각해 볼 질문이 없습니다.</p>';
+      panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 생각해 볼 질문이 없어요.</p>';
       return;
     }
 
     var html = '<div class="notes">' +
-      '<p class="notes-hint">정답을 정해 두는 곳이 아니라, 생각을 적어 두는 곳입니다. 적은 내용은 이 기기의 브라우저에만 저장되고 밖으로 나가지 않습니다.</p>';
+      '<p class="notes-hint">정답을 정해 두는 곳이 아니라, 생각을 적어 두는 곳이에요. 적은 내용은 이 기기의 브라우저에만 저장되고 밖으로 나가지 않아요.</p>';
 
     rs.forEach(function (r, i) {
       var qid = r.id || 'q' + (i + 1);
@@ -691,7 +691,7 @@
         '<div class="note-num">질문 ' + (i + 1) + '</div>' +
         '<h3 class="note-q">' + esc(r.question) + '</h3>' +
         (r.hint ? '<p class="note-hint">' + esc(r.hint) + '</p>' : '') +
-        '<textarea class="note-input" data-qid="' + esc(qid) + '" rows="4" placeholder="떠오르는 대로 적어 보세요. 자동으로 저장됩니다."></textarea>' +
+        '<textarea class="note-input" data-qid="' + esc(qid) + '" rows="4" placeholder="떠오르는 대로 적어 보세요. 자동으로 저장돼요."></textarea>' +
         '<div class="note-foot"><span class="save-state"></span>' +
           '<button class="link-btn" type="button" data-clear="' + esc(qid) + '">지우기</button></div>' +
       '</article>';
@@ -711,7 +711,7 @@
       if (!foot) return;
       var len = ta.value.trim().length;
       if (!len) {
-        foot.textContent = '아직 적지 않았습니다';
+        foot.textContent = '아직 적지 않았어요';
         foot.classList.remove('saved');
         return;
       }
@@ -782,7 +782,7 @@
         });
         var payload = lines.join('\n\n');
         if (!payload) {
-          copyBtn.textContent = '적어 둔 메모가 없습니다';
+          copyBtn.textContent = '적어 둔 메모가 없어요';
           window.setTimeout(function () { copyBtn.textContent = '메모 전체 복사'; }, 1600);
           return;
         }
@@ -791,7 +791,7 @@
           window.setTimeout(function () { copyBtn.textContent = '메모 전체 복사'; }, 1600);
         };
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(payload).then(done, function () { copyBtn.textContent = '복사할 수 없습니다'; });
+          navigator.clipboard.writeText(payload).then(done, function () { copyBtn.textContent = '복사할 수 없어요'; });
         } else {
           var area = document.createElement('textarea');
           area.value = payload;
@@ -839,7 +839,7 @@
   /* ---------- boot ---------- */
 
   function renderError(err) {
-    view.innerHTML = '<div class="state">브리핑을 불러오지 못했습니다.<br>' +
+    view.innerHTML = '<div class="state">브리핑을 불러오지 못했어요.<br>' +
       '<span style="font-size:12px;opacity:.7">' + esc(err && err.message ? err.message : '') + '</span><br>' +
       '<button class="btn btn-ghost" type="button" id="retry-load">다시 불러오기</button></div>';
     var btn = document.getElementById('retry-load');

@@ -414,7 +414,7 @@ button, textarea, input { font-family: inherit; font-size: inherit; }
 
 .deck {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
@@ -433,14 +433,12 @@ button, textarea, input { font-family: inherit; font-size: inherit; }
 }
 
 .card-inner {
-  height: 100%;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 
 /* top progress bar, like the reference */
@@ -644,21 +642,8 @@ button, textarea, input { font-family: inherit; font-size: inherit; }
 /* ---------- deck controls ---------- */
 
 .deck-ui {
-  position: sticky;
-  bottom: 0;
-  z-index: 15;
-  margin-top: 12px;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--line);
-  background: var(--bg);
-}
-
-@supports (backdrop-filter: blur(8px)) {
-  .deck-ui {
-    background: color-mix(in srgb, var(--bg) 82%, transparent);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
+  margin-top: 14px;
+  padding: 0 16px calc(6px + env(safe-area-inset-bottom));
 }
 
 .deck-row {
