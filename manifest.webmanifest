@@ -1,7 +1,7 @@
 {
-  "name": "슈카월드 아침 브리핑",
-  "short_name": "슈카 브리핑",
-  "description": "매일 아침 8시, 슈카월드 최신 영상을 카드로 읽습니다.",
+  "name": "아침 브리핑",
+  "short_name": "아침 브리핑",
+  "description": "매일 아침 8시, 채널별 새 영상과 X 화제를 카드로 읽습니다.",
   "lang": "ko",
   "dir": "ltr",
   "start_url": "./",

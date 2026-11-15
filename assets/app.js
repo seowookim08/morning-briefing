@@ -1,33 +1,44 @@
-/* 슈카월드 아침 브리핑 — vanilla JS, no build step */
+/* 슈카월드 아침 브리핑 — multi-channel daily briefing. vanilla JS, no build step */
 (function () {
   'use strict';
 
   var DATA_URL = 'data/episodes.json';
   var PREFIX = 'syuka.v1';
   var WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-  var TABS = [
+  var YT_TABS = [
     { key: 'cards', label: '읽기' },
     { key: 'quiz', label: '퀴즈' },
     { key: 'notes', label: '생각해 보기' }
   ];
 
-  var state = { episodes: [], generatedAt: '', loaded: false };
-  var panelAC = null;
+  var state = {
+    loaded: false,
+    channels: [],
+    episodes: [],
+    days: [],
+    index: {}
+  };
 
+  var panelAC = null;
   var view = document.getElementById('view');
+  var topbar = document.getElementById('topbar');
   var mastheadDate = document.getElementById('masthead-date');
 
-  /* ---------- small helpers ---------- */
+  /* ---------- helpers ---------- */
 
   var ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
 
   function esc(value) {
-    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
-      return ESC[c];
-    });
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) { return ESC[c]; });
   }
 
   function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+  function parseISO(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    if (!m) return null;
+    return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  }
 
   function formatDate(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
@@ -36,9 +47,30 @@
     return m[1] + '.' + m[2] + '.' + m[3] + ' (' + WEEKDAYS[d.getDay()] + ')';
   }
 
-  function shortDate(iso) {
+  function formatDateLong(iso) {
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) return String(iso || '');
+    var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number(m[1]) + '년 ' + Number(m[2]) + '월 ' + Number(m[3]) + '일 ' + WEEKDAYS[d.getDay()] + '요일';
+  }
+
+  function shortDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
     return m ? m[2] + '.' + m[3] : String(iso || '');
+  }
+
+  function shortTime(iso) {
+    if (!iso) return '';
+    var t = new Date(iso);
+    if (isNaN(t.getTime())) return '';
+    var kst = new Date(t.getTime() + (9 * 60 * 60 * 1000));
+    return pad(kst.getUTCMonth() + 1) + '.' + pad(kst.getUTCDate()) + ' ' +
+      pad(kst.getUTCHours()) + ':' + pad(kst.getUTCMinutes());
+  }
+
+  function todayISO() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   }
 
   function todayLabel() {
@@ -50,22 +82,18 @@
   function readText(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
   }
-
   function writeText(key, value) {
     try { localStorage.setItem(key, value); } catch (e) { /* private mode */ }
   }
-
   function removeText(key) {
     try { localStorage.removeItem(key); } catch (e) { /* private mode */ }
   }
-
   function readJSON(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (e) { return fallback; }
   }
-
   function writeJSON(key, value) {
     try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* private mode */ }
   }
@@ -75,10 +103,7 @@
     v = typeof v === 'number' && isFinite(v) ? Math.round(v) : 0;
     return Math.max(0, Math.min(Math.max(count - 1, 0), v));
   }
-
-  function writePos(episodeId, index) {
-    writeJSON(PREFIX + '.pos.' + episodeId, index);
-  }
+  function writePos(episodeId, index) { writeJSON(PREFIX + '.pos.' + episodeId, index); }
 
   function quizRecord(episodeId) {
     var r = readJSON(PREFIX + '.quiz.' + episodeId, null);
@@ -86,9 +111,7 @@
     return null;
   }
 
-  function noteKey(episodeId, questionId) {
-    return PREFIX + '.note.' + episodeId + '.' + questionId;
-  }
+  function noteKey(episodeId, questionId) { return PREFIX + '.note.' + episodeId + '.' + questionId; }
 
   function countNotes(episode) {
     var rs = Array.isArray(episode.reflections) ? episode.reflections : [];
@@ -101,135 +124,173 @@
     return n;
   }
 
-  /* ---------- routing ---------- */
+  /* ---------- index & routing ---------- */
 
-  function findEpisode(id) {
-    for (var i = 0; i < state.episodes.length; i += 1) {
-      if (state.episodes[i].id === id) return state.episodes[i];
+  function buildIndex() {
+    state.days = [];
+    state.index = {};
+    var seen = {};
+    state.episodes.forEach(function (ep) {
+      var day = ep.briefingDate || ep.date;
+      if (!seen[day]) { seen[day] = true; state.days.push(day); }
+      state.index[day + '|' + ep.channel] = ep;
+    });
+    state.days.sort(function (a, b) { return String(b).localeCompare(String(a)); });
+  }
+
+  function channelById(id) {
+    for (var i = 0; i < state.channels.length; i += 1) {
+      if (state.channels[i].id === id) return state.channels[i];
     }
     return null;
+  }
+
+  function episodeFor(day, channelId) {
+    return state.index[day + '|' + channelId] || null;
+  }
+
+  function channelHasContent(day) {
+    var map = {};
+    state.channels.forEach(function (ch) { if (episodeFor(day, ch.id)) map[ch.id] = true; });
+    return map;
+  }
+
+  function defaultChannelFor(day) {
+    var pref = ['syuka'];
+    for (var i = 0; i < pref.length; i += 1) {
+      if (episodeFor(day, pref[i])) return pref[i];
+    }
+    for (var j = 0; j < state.channels.length; j += 1) {
+      if (episodeFor(day, state.channels[j].id)) return state.channels[j].id;
+    }
+    return state.channels.length ? state.channels[0].id : 'syuka';
   }
 
   function parseRoute() {
     var raw = String(location.hash || '').replace(/^#/, '');
     var parts = raw.split('?')[0].split('/').filter(Boolean);
-    if (parts[0] === 'e' && parts[1]) {
-      var ep = findEpisode(decodeURIComponent(parts[1]));
-      if (ep) {
-        var tab = parts[2];
-        if (tab !== 'cards' && tab !== 'quiz' && tab !== 'notes') tab = 'cards';
-        return { name: 'reader', episode: ep, tab: tab };
+    var day = null;
+    var channel = null;
+    var tab = 'cards';
+
+    if (parts[0] === 'd' && parts[1]) {
+      var d = decodeURIComponent(parts[1]);
+      if (state.days.indexOf(d) >= 0) day = d;
+      if (parts[2]) {
+        var c = decodeURIComponent(parts[2]);
+        if (channelById(c)) channel = c;
       }
+      if (parts[3] && ['cards', 'quiz', 'notes'].indexOf(parts[3]) >= 0) tab = parts[3];
     }
-    return { name: 'home' };
+
+    if (!day) day = state.days.length ? state.days[0] : null;
+    if (!day) return null;
+    if (!channel) channel = defaultChannelFor(day);
+    return { day: day, channel: channel, tab: tab };
   }
 
-  function navigate(episodeId, tab) {
-    var hash = '#/e/' + encodeURIComponent(episodeId) + '/' + (tab || 'cards');
-    if (location.hash === hash) {
-      render();
-    } else {
-      location.hash = hash;
-    }
+  function navigate(day, channel, tab) {
+    var hash = '#/d/' + encodeURIComponent(day) + '/' + encodeURIComponent(channel) + '/' + (tab || 'cards');
+    if (location.hash === hash) render();
+    else location.hash = hash;
   }
+
+  /* ---------- render ---------- */
 
   function render() {
     if (!state.loaded) return;
     var route = parseRoute();
-    if (route.name === 'reader') {
-      renderReader(route.episode, route.tab);
-    } else {
-      if (panelAC) { panelAC.abort(); panelAC = null; }
-      renderHome();
+    if (!route) {
+      view.innerHTML = '<div class="state">아직 브리핑이 없습니다.<br>매일 아침 8시에 새 브리핑이 올라옵니다.</div>';
+      topbar.innerHTML = '';
+      return;
     }
+    renderTopbar(route);
+    renderContent(route);
     window.scrollTo(0, 0);
   }
 
-  /* ---------- home ---------- */
+  function renderTopbar(route) {
+    var dayIdx = state.days.indexOf(route.day);
+    var has = channelHasContent(route.day);
+    var isToday = route.day === todayISO();
 
-  function episodeMetaLine(ep) {
-    var bits = [];
-    var cards = Array.isArray(ep.cards) ? ep.cards.length : 0;
-    var quiz = Array.isArray(ep.quizzes) ? ep.quizzes.length : 0;
-    if (cards) bits.push('카드 ' + cards);
-    if (quiz) bits.push('퀴즈 ' + quiz);
-    return bits.join(' · ');
+    var dateHTML = '<div class="datebar">' +
+      '<button class="date-nav" type="button" id="prev-day" aria-label="이전 날짜"' +
+        (dayIdx >= state.days.length - 1 ? ' disabled' : '') + '>‹</button>' +
+      '<button class="date-pick" type="button" id="date-pick">' +
+        '<span class="date-main">' + esc(formatDate(route.day)) + '</span>' +
+        (isToday ? '<span class="date-tag">오늘</span>' : '') +
+        '<span class="date-caret">▾</span>' +
+      '</button>' +
+      '<button class="date-nav" type="button" id="next-day" aria-label="다음 날짜"' +
+        (dayIdx <= 0 ? ' disabled' : '') + '>›</button>' +
+    '</div>';
+
+    var chHTML = '<nav class="channels" id="channels" aria-label="채널">' +
+      state.channels.map(function (ch) {
+        var active = ch.id === route.channel;
+        return '<button class="ch-tab' + (active ? ' on' : '') + '" type="button" data-ch="' + esc(ch.id) + '"' +
+          (active ? ' aria-current="true"' : '') + '>' +
+          '<span class="ch-name">' + esc(ch.name) + '</span>' +
+          '<span class="ch-dot' + (has[ch.id] ? ' on' : '') + '" aria-hidden="true"></span>' +
+          '<span class="sr-only">' + (has[ch.id] ? '새 브리핑 있음' : '새 브리핑 없음') + '</span>' +
+        '</button>';
+      }).join('') + '</nav>';
+
+    topbar.innerHTML = dateHTML + chHTML;
+
+    var prev = document.getElementById('prev-day');
+    if (prev) prev.addEventListener('click', function () {
+      var i = state.days.indexOf(route.day);
+      var nextDay = state.days[i + 1];
+      if (nextDay) navigate(nextDay, route.channel, 'cards');
+    });
+
+    var next = document.getElementById('next-day');
+    if (next) next.addEventListener('click', function () {
+      var i = state.days.indexOf(route.day);
+      var nextDay = state.days[i - 1];
+      if (nextDay) navigate(nextDay, route.channel, 'cards');
+    });
+
+    var pick = document.getElementById('date-pick');
+    if (pick) pick.addEventListener('click', function () { openDateSheet(route); });
+
+    var channels = document.getElementById('channels');
+    if (channels) channels.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('.ch-tab');
+      if (!btn) return;
+      navigate(route.day, btn.getAttribute('data-ch'), 'cards');
+    });
+
+    var active = topbar.querySelector('.ch-tab.on');
+    if (active && active.scrollIntoView) {
+      try { active.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) { /* old browser */ }
+    }
   }
 
-  function renderHome() {
-    var eps = state.episodes;
-    if (!eps.length) {
-      view.innerHTML = '<div class="state">아직 브리핑이 없습니다.<br>매일 아침 8시에 새 브리핑이 올라옵니다.</div>';
+  function renderContent(route) {
+    if (panelAC) { panelAC.abort(); panelAC = null; }
+
+    var ep = episodeFor(route.day, route.channel);
+    var ch = channelById(route.channel);
+    if (!ch) return;
+
+    if (!ep) {
+      view.innerHTML = emptyStateHTML(route, ch);
+      var retry = document.getElementById('go-latest');
+      if (retry) retry.addEventListener('click', function () {
+        var latest = state.days[0];
+        navigate(latest, defaultChannelFor(latest), 'cards');
+      });
       return;
     }
 
-    var latest = eps[0];
-    var cards = Array.isArray(latest.cards) ? latest.cards : [];
-    var quizzes = Array.isArray(latest.quizzes) ? latest.quizzes : [];
-    var reflections = Array.isArray(latest.reflections) ? latest.reflections : [];
-    var pos = readPos(latest.id, Math.max(cards.length, 1));
-    var rec = quizRecord(latest.id);
-    var notes = countNotes(latest);
-    var started = pos > 0 || !!rec || notes > 0;
-
-    var html = '<section class="home">' +
-      '<article class="hero">' +
-        '<div class="hero-label">오늘의 브리핑</div>' +
-        '<h1 class="hero-title">' + esc(latest.title) + '</h1>' +
-        (latest.summary ? '<p class="hero-dek">' + esc(latest.summary) + '</p>' : '') +
-        '<div class="chips">' +
-          '<span class="chip chip-bar">' + esc(formatDate(latest.date)) + '</span>' +
-          (cards.length ? '<span class="chip">카드 ' + cards.length + '</span>' : '') +
-          (quizzes.length ? '<span class="chip">퀴즈 ' + quizzes.length + '</span>' : '') +
-          (reflections.length ? '<span class="chip">질문 ' + reflections.length + '</span>' : '') +
-          (rec ? '<span class="chip">퀴즈 ' + rec.best + '/' + rec.total + '</span>' : '') +
-        '</div>' +
-        '<div class="hero-actions">' +
-          '<a class="btn btn-primary" href="#/e/' + encodeURIComponent(latest.id) + '/cards">' +
-            (started ? '이어 읽기 · ' + (pos + 1) + '/' + cards.length : '읽기 시작') +
-          '</a>' +
-          (latest.url ? '<a class="btn btn-ghost" href="' + esc(latest.url) + '" target="_blank" rel="noopener">원문 영상</a>' : '') +
-        '</div>' +
-      '</article>';
-
-    if (eps.length > 1) {
-      html += '<div class="section-head"><h2>지난 브리핑</h2><span>' + (eps.length - 1) + '편</span></div>' +
-        '<ul class="ep-list">';
-      eps.slice(1).forEach(function (ep) {
-        var n = Array.isArray(ep.cards) ? ep.cards.length : 0;
-        var p = readPos(ep.id, Math.max(n, 1));
-        var done = n > 0 && p >= n - 1;
-        html += '<li class="ep-item"><a class="ep-link" href="#/e/' + encodeURIComponent(ep.id) + '/cards">' +
-          '<div class="ep-date">' + esc(formatDate(ep.date)) + '</div>' +
-          '<h3 class="ep-name">' + esc(ep.title) + '</h3>' +
-          '<div class="ep-sub"><span>' + esc(episodeMetaLine(ep)) + '</span>' +
-            (done ? '<span class="dot-sep"></span><span class="ep-done">다 읽음</span>' : '') +
-          '</div></a></li>';
-      });
-      html += '</ul>';
-    } else {
-      html += '<div class="empty-note">매일 아침 8시, 슈카월드에 새 영상이 올라오면 그 영상을 카드로 정리해 여기에 쌓입니다. ' +
-        '읽던 자리와 퀴즈 점수, 적어 둔 생각은 이 기기에 저장됩니다.</div>';
-    }
-
-    html += '<div class="site-foot">슈카월드 최신 영상을 매일 아침 카드로 정리합니다.<br>' +
-      '원본 영상과 모든 내용의 출처는 <a href="https://www.youtube.com/@syukaworld" target="_blank" rel="noopener">슈카월드 유튜브 채널</a>입니다.' +
-      '</div></section>';
-
-    view.innerHTML = html;
-  }
-
-  /* ---------- reader ---------- */
-
-  function renderReader(ep, tab) {
-    if (panelAC) panelAC.abort();
     panelAC = new AbortController();
     var sig = { signal: panelAC.signal };
-
-    var tabsHTML = TABS.map(function (t) {
-      return '<button type="button" role="tab" data-tab="' + t.key + '" aria-selected="' +
-        (t.key === tab ? 'true' : 'false') + '">' + t.label + '</button>';
-    }).join('');
+    var isYT = ch.kind === 'youtube';
+    var tab = isYT ? route.tab : 'cards';
 
     var numbers = Array.isArray(ep.numbers) ? ep.numbers.filter(function (n) { return n && n.value; }) : [];
     var numbersHTML = numbers.length ? '<div class="numstrip">' + numbers.map(function (n) {
@@ -237,45 +298,79 @@
         (n.label ? '<div class="numstrip-label">' + esc(n.label) + '</div>' : '') + '</div>';
     }).join('') + '</div>' : '';
 
+    var subtabs = isYT ? '<nav class="tabs" role="tablist">' + YT_TABS.map(function (t) {
+      return '<button type="button" role="tab" data-tab="' + t.key + '" aria-selected="' +
+        (t.key === tab ? 'true' : 'false') + '">' + t.label + '</button>';
+    }).join('') + '</nav>' : '';
+
+    var action = ep.url
+      ? '<a class="btn ' + (isYT ? 'btn-yt' : 'btn-ghost') + '" href="' + esc(ep.url) + '" target="_blank" rel="noopener">' +
+        (isYT ? '▶ 원문 영상' : '원문 게시물') + '</a>'
+      : '';
+
     view.innerHTML = '<section class="reader">' +
-      '<a class="back" href="#/">← 브리핑 목록</a>' +
       '<header class="ep-head">' +
-        '<div class="ep-meta">' + esc(formatDate(ep.date)) + ' · 슈카월드</div>' +
+        '<div class="ep-meta">' +
+          '<span class="ch-badge">' + esc(ch.name) + '</span>' +
+          '<span class="ep-dot"></span>' +
+          '<span>' + esc(formatDate(ep.date)) + (isYT ? '' : ' · ' + (ep.cards || []).length + '개 화제') + '</span>' +
+        '</div>' +
         '<h1 class="ep-title">' + esc(ep.title) + '</h1>' +
         (ep.subtitle ? '<p class="ep-subtitle">' + esc(ep.subtitle) + '</p>' : '') +
         (ep.summary ? '<p class="ep-dek">' + esc(ep.summary) + '</p>' : '') +
         numbersHTML +
-        '<div class="ep-actions">' +
-          (ep.url ? '<a class="btn btn-yt" href="' + esc(ep.url) + '" target="_blank" rel="noopener">▶ 원문 영상 보기</a>' : '') +
-          (state.episodes.length > 1 ? '<button class="btn btn-ghost" type="button" id="switch-btn">지난 브리핑</button>' : '') +
-        '</div>' +
+        (action ? '<div class="ep-actions">' + action + '</div>' : '') +
       '</header>' +
-      '<nav class="tabs" role="tablist">' + tabsHTML + '</nav>' +
+      subtabs +
       '<div id="panel"></div>' +
     '</section>';
 
     var tabsEl = view.querySelector('.tabs');
-    tabsEl.addEventListener('click', function (ev) {
-      var btn = ev.target.closest('button[data-tab]');
-      if (!btn) return;
-      navigate(ep.id, btn.getAttribute('data-tab'));
-    }, sig);
-
-    var switchBtn = view.querySelector('#switch-btn');
-    if (switchBtn) {
-      switchBtn.addEventListener('click', function () { openEpisodeSheet(ep.id); }, sig);
+    if (tabsEl) {
+      tabsEl.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button[data-tab]');
+        if (btn) navigate(route.day, route.channel, btn.getAttribute('data-tab'));
+      }, sig);
     }
 
     var panel = view.querySelector('#panel');
-    if (tab === 'quiz') renderQuiz(ep, panel, sig);
-    else if (tab === 'notes') renderNotes(ep, panel, sig);
-    else renderCards(ep, panel, sig);
+    if (isYT && tab === 'quiz') renderQuiz(ep, panel, sig);
+    else if (isYT && tab === 'notes') renderNotes(ep, panel, sig);
+    else renderCards(ep, panel, sig, ch);
   }
 
-  function cardHTML(card, i, total) {
+  function emptyStateHTML(route, ch) {
+    var isYT = ch.kind === 'youtube';
+    var link = isYT
+      ? 'https://www.youtube.com/channel/' + ch.source
+      : 'https://x.com/search?q=' + encodeURIComponent(ch.name === '뉴진스' ? '뉴진스' : 'AI') + '&f=live';
+    return '<div class="state empty">' +
+      '<div class="empty-ch">' + esc(ch.name) + '</div>' +
+      '<p>' + esc(formatDateLong(route.day)) + '에는<br>' + esc(ch.name) + ' 새 브리핑이 없습니다.</p>' +
+      '<p class="empty-sub">새 영상이나 화제가 잡히면 다음 아침 8시에 이 자리에 올라옵니다.</p>' +
+      '<a class="btn btn-ghost" href="' + esc(link) + '" target="_blank" rel="noopener">' +
+        (isYT ? '채널 바로 가기' : 'X에서 보기') + '</a>' +
+    '</div>';
+  }
+
+  /* ---------- cards ---------- */
+
+  function sourcesHTML(card) {
+    var list = Array.isArray(card.sources) ? card.sources : [];
+    if (!list.length) return '';
+    return '<div class="sources">' + list.map(function (s) {
+      return '<a class="source" href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
+        '<span class="source-tag">X</span>' +
+        '<span class="source-author">@' + esc(s.author) + '</span>' +
+        (s.time ? '<span class="source-time">' + esc(shortTime(s.time)) + '</span>' : '') +
+        '<span class="source-arrow">↗</span>' +
+      '</a>';
+    }).join('') + '</div>';
+  }
+
+  function cardHTML(card, i, total, kind) {
     var body = Array.isArray(card.body) ? card.body : [];
     var bodyHTML = body.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
-    var tag = card.kicker ? String(card.kicker).split('·')[1] : '';
 
     return '<article class="card" data-i="' + i + '"><div class="card-inner">' +
       (card.kicker ? '<div class="card-kicker">' + esc(card.kicker) + '</div>' : '') +
@@ -287,21 +382,23 @@
         (card.stat.label ? '<div class="stat-label">' + esc(card.stat.label) + '</div>' : '') +
       '</div>' : '') +
       (card.footnote ? '<p class="footnote">' + esc(card.footnote) + '</p>' : '') +
+      sourcesHTML(card) +
       '<div class="card-foot"><span>' + pad(i + 1) + ' / ' + pad(total) + '</span>' +
-        (tag ? '<span>' + esc(tag.trim()) + '</span>' : '') + '</div>' +
+        (kind === 'x' ? '<span class="foot-x">X 실시간</span>' : '') + '</div>' +
     '</div></article>';
   }
 
-  function renderCards(ep, panel, sig) {
+  function renderCards(ep, panel, sig, ch) {
     var cards = Array.isArray(ep.cards) ? ep.cards : [];
     var n = cards.length;
+    var kind = (ch && ch.kind) || 'youtube';
     if (!n) {
       panel.innerHTML = '<p class="muted" style="padding:24px 0">이 편에는 카드가 없습니다.</p>';
       return;
     }
 
     var html = '<div class="deck-wrap" id="deck-wrap"><div class="deck" id="deck">' +
-      cards.map(function (c, i) { return cardHTML(c, i, n); }).join('') +
+      cards.map(function (c, i) { return cardHTML(c, i, n, kind); }).join('') +
       '</div></div>';
 
     if (n > 1) {
@@ -319,19 +416,21 @@
       '</div>';
     }
 
-    html += '<div class="end-cta">' +
-      '<p>여기까지 읽었습니다. 기억에 남는 숫자 하나를 골라 두면 훨씬 오래 갑니다.</p>' +
-      '<div class="end-cta-row">' +
-        '<button class="btn btn-primary" type="button" id="go-quiz">퀴즈 풀기</button>' +
-        '<button class="btn btn-ghost" type="button" id="go-notes">생각 정리하기</button>' +
-      '</div></div>';
+    if (kind === 'youtube') {
+      html += '<div class="end-cta">' +
+        '<p>여기까지 읽었습니다. 기억에 남는 숫자 하나를 골라 두면 훨씬 오래 갑니다.</p>' +
+        '<div class="end-cta-row">' +
+          '<button class="btn btn-primary" type="button" id="go-quiz">퀴즈 풀기</button>' +
+          '<button class="btn btn-ghost" type="button" id="go-notes">생각 정리하기</button>' +
+        '</div></div>';
+    }
 
     panel.innerHTML = html;
 
     var goQuiz = panel.querySelector('#go-quiz');
-    if (goQuiz) goQuiz.addEventListener('click', function () { navigate(ep.id, 'quiz'); }, sig);
+    if (goQuiz) goQuiz.addEventListener('click', function () { navigate(ep.briefingDate || ep.date, ep.channel, 'quiz'); }, sig);
     var goNotes = panel.querySelector('#go-notes');
-    if (goNotes) goNotes.addEventListener('click', function () { navigate(ep.id, 'notes'); }, sig);
+    if (goNotes) goNotes.addEventListener('click', function () { navigate(ep.briefingDate || ep.date, ep.channel, 'notes'); }, sig);
 
     var deck = panel.querySelector('#deck');
     var wrap = panel.querySelector('#deck-wrap');
@@ -347,7 +446,6 @@
     var last = index;
 
     function cardWidth() { return deck.clientWidth || 1; }
-
     function current() {
       return Math.max(0, Math.min(n - 1, Math.round(deck.scrollLeft / cardWidth())));
     }
@@ -355,12 +453,6 @@
     function paint(i) {
       if (bar) bar.style.width = (((i + 1) / n) * 100) + '%';
       if (counter) counter.textContent = (i + 1) + ' / ' + n;
-      var hint = panel.querySelector('#swipe-hint');
-      if (hint) {
-        if (i > 0) {
-          hint.parentNode.removeChild(hint);
-        }
-      }
       if (dots) {
         Array.prototype.forEach.call(dots.children, function (d, k) {
           if (k === i) d.classList.add('on'); else d.classList.remove('on');
@@ -370,9 +462,14 @@
       if (next) {
         var atEnd = i === n - 1;
         if (atEnd) next.classList.add('is-end'); else next.classList.remove('is-end');
-        next.textContent = atEnd ? '퀴즈 풀기 →' : '→';
-        next.setAttribute('aria-label', atEnd ? '퀴즈 풀기' : '다음 카드');
+        next.textContent = atEnd
+          ? (kind === 'youtube' ? '퀴즈 풀기 →' : '끝')
+          : '→';
+        next.setAttribute('aria-label', atEnd ? (kind === 'youtube' ? '퀴즈 풀기' : '마지막 카드') : '다음 카드');
+        next.disabled = atEnd && kind !== 'youtube';
       }
+      var hint = panel.querySelector('#swipe-hint');
+      if (hint && i > 0) hint.parentNode.removeChild(hint);
     }
 
     function onScroll() {
@@ -397,7 +494,7 @@
       } else {
         deck.scrollLeft = left;
       }
-      var top = wrap.getBoundingClientRect().top + window.scrollY - 64;
+      var top = wrap.getBoundingClientRect().top + window.scrollY - 110;
       if (window.scrollY > top) window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
     }
 
@@ -406,16 +503,19 @@
       if (prev) prev.addEventListener('click', function () { goTo(current() - 1); }, sig);
       if (next) next.addEventListener('click', function () {
         var i = current();
-        if (i >= n - 1) navigate(ep.id, 'quiz');
-        else goTo(i + 1);
+        if (i >= n - 1) {
+          if (kind === 'youtube') navigate(ep.briefingDate || ep.date, ep.channel, 'quiz');
+        } else {
+          goTo(i + 1);
+        }
       }, sig);
       if (dots) dots.addEventListener('click', function (ev) {
         var b = ev.target.closest('button[data-i]');
         if (b) goTo(Number(b.getAttribute('data-i')));
       }, sig);
       window.addEventListener('keydown', function (ev) {
-        if (ev.key === 'ArrowRight') { goTo(current() + 1); }
-        else if (ev.key === 'ArrowLeft') { goTo(current() - 1); }
+        if (ev.key === 'ArrowRight') goTo(current() + 1);
+        else if (ev.key === 'ArrowLeft') goTo(current() - 1);
       }, sig);
       window.addEventListener('resize', function () {
         deck.scrollLeft = Math.max(0, Math.min(n - 1, last)) * cardWidth();
@@ -491,7 +591,8 @@
         else if (k === picked) b.classList.add('wrong');
       });
 
-      var head = correct ? '✓ 정답입니다' : '✕ 아쉬워요 — 정답은 ' + esc(o.opts[q.answer] == null ? '' : String(o.opts[q.answer]).slice(0, 40));
+      var head = correct ? '✓ 정답입니다'
+        : '✕ 아쉬워요 — 정답은 ' + esc(String(o.opts[q.answer] == null ? '' : o.opts[q.answer]).slice(0, 40));
       var fb = panel.querySelector('#fb');
       fb.innerHTML = '<div class="fb ' + (correct ? 'ok' : 'no') + '">' +
         '<div class="fb-head">' + head + '</div>' +
@@ -504,8 +605,8 @@
         if (idx < qs.length - 1) {
           idx += 1;
           draw();
-          var tabs = document.querySelector('.tabs');
-          if (tabs) window.scrollTo({ top: Math.max(0, tabs.getBoundingClientRect().top + window.scrollY - 70), behavior: 'smooth' });
+          var tabs = view.querySelector('.tabs');
+          if (tabs) window.scrollTo({ top: Math.max(0, tabs.getBoundingClientRect().top + window.scrollY - 110), behavior: 'smooth' });
         } else {
           finish();
         }
@@ -536,10 +637,9 @@
 
       var reviewHTML = wrong.length ? '<div class="review">' + wrong.map(function (w) {
         var o = quizOptions(w.q);
-        var label = o.opts[w.q.answer];
         return '<div class="review-item">' +
           '<div class="review-q">' + esc(w.q.question) + '</div>' +
-          '<div class="review-a">정답 · ' + esc(label) + '</div>' +
+          '<div class="review-a">정답 · ' + esc(o.opts[w.q.answer]) + '</div>' +
         '</div>';
       }).join('') + '</div>' : '';
 
@@ -558,7 +658,7 @@
         draw();
       }, sig);
       panel.querySelector('#to-notes').addEventListener('click', function () {
-        navigate(ep.id, 'notes');
+        navigate(ep.briefingDate || ep.date, ep.channel, 'notes');
       }, sig);
     }
 
@@ -658,7 +758,7 @@
       }
 
       if (ev.target.closest('#to-quiz')) {
-        navigate(ep.id, 'quiz');
+        navigate(ep.briefingDate || ep.date, ep.channel, 'quiz');
         return;
       }
 
@@ -696,32 +796,31 @@
     }, sig);
   }
 
-  /* ---------- episode sheet ---------- */
+  /* ---------- date sheet ---------- */
 
-  function openEpisodeSheet(currentId) {
+  function openDateSheet(route) {
     var backdrop = document.createElement('div');
     backdrop.className = 'sheet-backdrop';
-    backdrop.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="브리핑 목록">' +
-      '<div class="sheet-head"><div class="sheet-title">브리핑 목록</div>' +
+    backdrop.innerHTML = '<div class="sheet" role="dialog" aria-modal="true" aria-label="날짜 선택">' +
+      '<div class="sheet-head"><div class="sheet-title">브리핑 날짜</div>' +
         '<button class="sheet-close" type="button" aria-label="닫기">✕</button></div>' +
-      '<ul class="sheet-list">' + state.episodes.map(function (e) {
-        return '<li class="sheet-item' + (e.id === currentId ? ' current' : '') + '">' +
-          '<a href="#/e/' + encodeURIComponent(e.id) + '/cards">' +
-            '<span class="d">' + esc(shortDate(e.date)) + '</span>' +
-            '<span class="t">' + esc(e.title) + '</span>' +
+      '<ul class="sheet-list">' + state.days.map(function (d) {
+        var has = channelHasContent(d);
+        var count = Object.keys(has).length;
+        return '<li class="sheet-item' + (d === route.day ? ' current' : '') + '">' +
+          '<a href="#/d/' + encodeURIComponent(d) + '/' + encodeURIComponent(route.channel) + '/cards">' +
+            '<span class="d">' + esc(shortDate(d)) + '</span>' +
+            '<span class="t">' + esc(formatDateLong(d)) + '</span>' +
+            '<span class="n">' + count + '개 채널</span>' +
           '</a></li>';
-      }).join('') + '</ul>' +
-    '</div>';
+      }).join('') + '</ul></div>';
     document.body.appendChild(backdrop);
 
     function close() {
       if (backdrop.parentNode) backdrop.parentNode.removeChild(backdrop);
       document.removeEventListener('keydown', onKey);
     }
-
-    function onKey(ev) {
-      if (ev.key === 'Escape') close();
-    }
+    function onKey(ev) { if (ev.key === 'Escape') close(); }
 
     backdrop.addEventListener('click', function (ev) {
       if (ev.target === backdrop || ev.target.closest('.sheet-close') || ev.target.closest('a')) close();
@@ -750,9 +849,10 @@
       })
       .then(function (data) {
         var list = Array.isArray(data) ? data : (data && Array.isArray(data.episodes) ? data.episodes : []);
-        list.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
+        var channels = data && Array.isArray(data.channels) ? data.channels : [];
+        state.channels = channels;
         state.episodes = list;
-        state.generatedAt = (data && data.generatedAt) || '';
+        buildIndex();
         state.loaded = true;
         render();
       })
