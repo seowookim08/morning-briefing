@@ -47,7 +47,7 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
       "channel": "syuka",                        // channels[].id
       "briefingDate": "2026-11-15",              // 이 브리핑이 실리는 날 (날짜 바 기준)
       "date": "2026-11-14",                      // 원본 게시일
-      "title": "…", "shortTitle": "짧은 이름", "subtitle": "…", "summary": "…",
+      "title": "…", "subtitle": "…", "summary": "…",
       "tags": ["키워드", "키워드"],                       // 선택 (에피소드 단위)
       "url": "https://www.youtube.com/watch?v=yagCF3JqwAE",
       "numbers": [ { "value": "−41%", "label": "신규 구인 4년 새" } ],

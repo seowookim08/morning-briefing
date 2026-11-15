@@ -11,7 +11,6 @@ briefingDate(이 브리핑이 실리는 날) 중 하나는 있어야 하며,
 briefingDate 가 없으면 date 를 쓴다.
 
 선택 키:
-  shortTitle  화면 상단에 한 줄로 보이는 짧은 이름
 tags        에피소드와 카드 모두 선택. 카드마다 3~4개의 키워드 알약(pill)으로
             표시되므로 짧은 말로 적는다. 본문 문단의 **이렇게** 표시는
             굵은 글씨로 렌더링된다(홀수 개면 검증에서 걸린다).
@@ -128,8 +127,6 @@ def check_episode(ep, channel_ids):
         fail("episode.numbers must be an array when present")
 
     check_tags(ep.get("tags"), "episode")
-    if ep.get("shortTitle") is not None and not check_text(ep["shortTitle"]):
-        fail("episode.shortTitle must be a non-empty string when present")
     for key in ("subtitle", "summary"):
         check_emphasis(ep.get(key), f"episode.{key}")
 
