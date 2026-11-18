@@ -331,6 +331,41 @@ button, textarea, input { font-family: inherit; font-size: inherit; }
 
 .ep-link:active { background: var(--card-2); }
 
+.ep-switch {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 0 10px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.ep-switch::-webkit-scrollbar { display: none; }
+
+.ep-chip {
+  flex: none;
+  max-width: 46vw;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-4);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ep-chip.on {
+  color: var(--sage-ink);
+  background: var(--sage-bg);
+  border-color: var(--sage-line);
+}
+
 .ep-dot {
   width: 3px;
   height: 3px;

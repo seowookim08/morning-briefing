@@ -16,7 +16,9 @@
     channels: [],
     episodes: [],
     days: [],
-    index: {}
+    index: {},
+    lists: {},
+    sel: {}
   };
 
   var panelAC = null;
@@ -134,13 +136,21 @@
   function buildIndex() {
     state.days = [];
     state.index = {};
+    state.lists = {};
     var seen = {};
     state.episodes.forEach(function (ep) {
       var day = ep.briefingDate || ep.date;
       if (!seen[day]) { seen[day] = true; state.days.push(day); }
       state.index[day + '|' + ep.channel] = ep;
+      var key = day + '|' + ep.channel;
+      if (!state.lists[key]) state.lists[key] = [];
+      state.lists[key].push(ep);
     });
     state.days.sort(function (a, b) { return String(b).localeCompare(String(a)); });
+  }
+
+  function episodesFor(day, channelId) {
+    return state.lists[day + '|' + channelId] || [];
   }
 
   function channelById(id) {
@@ -151,7 +161,11 @@
   }
 
   function episodeFor(day, channelId) {
-    return state.index[day + '|' + channelId] || null;
+    var list = episodesFor(day, channelId);
+    if (!list.length) return null;
+    var i = state.sel[day + '|' + channelId] || 0;
+    if (i < 0 || i >= list.length) i = 0;
+    return list[i];
   }
 
   function channelHasContent(day) {
@@ -313,7 +327,19 @@
         (isYT ? '원문 영상' : '원문') + ' <span aria-hidden="true">↗</span></a>'
       : '';
 
+    var list = episodesFor(route.day, route.channel);
+    var switchHTML = list.length > 1
+      ? '<div class="ep-switch" role="tablist" aria-label="오늘 올라온 영상">' + list.map(function (item, i) {
+          var name = String(item.title || '');
+          if (name.length > 20) name = name.slice(0, 20) + '…';
+          return '<button class="ep-chip' + (item.id === ep.id ? ' on' : '') + '" type="button"' +
+            ' role="tab" aria-selected="' + (item.id === ep.id ? 'true' : 'false') + '"' +
+            ' title="' + esc(item.title || '') + '" data-ep="' + i + '">' + esc(name) + '</button>';
+        }).join('') + '</div>'
+      : '';
+
     view.innerHTML = '<section class="reader">' +
+      switchHTML +
       '<div class="ep-bar">' +
         '<span class="ch-badge">' + esc(ch.name) + '</span>' +
         '<h1 class="ep-title">' + esc(ep.title) + '</h1>' +
@@ -323,6 +349,17 @@
       subtabs +
       '<div id="panel"></div>' +
     '</section>';
+
+    var switchEl = view.querySelector('.ep-switch');
+    if (switchEl) {
+      switchEl.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('button[data-ep]');
+        if (!btn) return;
+        state.sel[route.day + '|' + route.channel] = Number(btn.getAttribute('data-ep')) || 0;
+        renderContent(route);
+      }, sig);
+    }
+
 
     var tabsEl = view.querySelector('.tabs');
     if (tabsEl) {
