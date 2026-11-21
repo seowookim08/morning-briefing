@@ -3,14 +3,6 @@
 매일 아침 8시(KST) 다섯 개 채널의 새 소식을 **카드로 넘겨 읽고, 퀴즈로 확인하고, 생각을 적어 두는** 정적 웹앱입니다.
 빌드 도구 없이 HTML/CSS/JS로 동작하고 GitHub Pages에서 그대로 서빙됩니다.
 
-| 탭 | 종류 | 출처 |
-| --- | --- | --- |
-| 슈카 | YouTube | `UCsJ6RuBiTVWRX156FVbeaGg` |
-| 코드팩토리 | YouTube | `UCxZ2AlaT0hOmxzZVbF_j_Sw` |
-| 뉴탐사 | YouTube | `UCpr8CBjls1XYoSd98d6aT1w` |
-| AI·테크 | X 검색 | X 최신 게시물 |
-| 뉴진스 | X 검색 | X 최신 게시물 |
-
 - YouTube 탭: 카드 넘기기 + 맞춤 퀴즈 + 생각해 볼 질문(브라우저에 자동 저장) + 원문 영상 링크
 - X 탭: 화제 카드 + 원문 X 게시물 링크 (소식이 없으면 빈 상태)
 
