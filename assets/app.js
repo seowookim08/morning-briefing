@@ -401,8 +401,11 @@
 
   /* ---------- cards ---------- */
 
-  function isXUrl(url) {
-    return /^https?:\/\/(www\.|mobile\.)?(x|twitter)\.com\//i.test(String(url || ''));
+  function sourceKind(url) {
+    var u = String(url || '');
+    if (/^https?:\/\/(www\.|mobile\.)?(x|twitter)\.com\//i.test(u)) return 'x';
+    if (/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(u)) return 'yt';
+    return 'article';
   }
 
   /* ISO 날짜만 있으면 11.27 처럼, 시각까지 있으면 11.27 09:20 처럼 */
@@ -415,13 +418,14 @@
     var list = Array.isArray(card.sources) ? card.sources : [];
     if (!list.length) return '';
     return '<div class="sources">' + list.map(function (s) {
-      var x = isXUrl(s.url);
+      var sk = sourceKind(s.url);
       var who = String(s.author || '');
-      if (x && who.charAt(0) !== '@') who = '@' + who;
-      if (!x && who.charAt(0) === '@') who = who.slice(1);
+      if (sk === 'x' && who.charAt(0) !== '@') who = '@' + who;
+      if (sk !== 'x' && who.charAt(0) === '@') who = who.slice(1);
+      var tag = sk === 'x' ? 'X' : (sk === 'yt' ? '영상' : '기사');
       return '<a class="source" href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
-        '<span class="source-tag">' + (x ? 'X' : '기사') + '</span>' +
-        '<span class="source-author">' + esc(who || (x ? 'X 게시물' : '기사 원문')) + '</span>' +
+        '<span class="source-tag">' + tag + '</span>' +
+        '<span class="source-author">' + esc(who || '원문') + '</span>' +
         (s.time ? '<span class="source-time">' + esc(sourceStamp(s.time)) + '</span>' : '') +
         '<span class="source-arrow">↗</span>' +
       '</a>';
