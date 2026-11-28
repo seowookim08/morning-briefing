@@ -1,10 +1,10 @@
 # 아침 브리핑 (morning-briefing)
 
-매일 아침 8시(KST) 다섯 개 채널의 새 소식을 **카드로 넘겨 읽고, 퀴즈로 확인하고, 생각을 적어 두는** 정적 웹앱입니다.
+매일 아침 8시(KST) 네 개 채널의 새 소식을 **카드로 넘겨 읽고, 퀴즈로 확인하고, 생각을 적어 두는** 정적 웹앱입니다.
 빌드 도구 없이 HTML/CSS/JS로 동작하고 GitHub Pages에서 그대로 서빙됩니다.
 
-- YouTube 탭: 카드 넘기기 + 맞춤 퀴즈 + 생각해 볼 질문(브라우저에 자동 저장) + 원문 영상 링크
-- X 탭: 화제 카드 + 원문 X 게시물 링크 (소식이 없으면 빈 상태)
+- 유튜브 채널(`슈카`): 새 영상 카드 + 맞춤 퀴즈 + 생각해 볼 질문(브라우저에 자동 저장) + 원문 영상 링크
+- 기사 채널(`AI·테크`, `창업`, `뉴진스`): 실제 기사 기반 카드 + 출처 기사 링크(기사에 퀴즈·질문이 있으면 같은 탭으로 함께 나옴, 소식이 없으면 빈 상태)
 
 ## 구조
 
@@ -19,8 +19,10 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
 .nojekyll               GitHub Pages가 Jekyll로 전처리하지 않도록
 ```
 
-라우팅은 해시 기반입니다: `#/d/{브리핑 날짜}/{채널 id}/{cards|quiz|notes}` (X 채널은 `cards`만).
+라우팅은 해시 기반입니다: `#/d/{브리핑 날짜}/{채널 id}/{cards|quiz|notes}`.
+읽기·퀴즈·생각해 보기는 모든 채널에 있고, 에피소드에 퀴즈나 질문이 없으면 그 탭은 나타나지 않습니다.
 경로가 없으면 가장 최근 날짜의 기본 채널(슈카 → 콘텐츠가 있는 첫 채널)로 엽니다.
+`channels` 배열에 없는 채널의 에피소드(예전 `코드팩토리`·`뉴탐사`)는 파일에 남아 있어도 화면에는 올라가지 않습니다.
 
 ## data/episodes.json 스키마 (version 2)
 
@@ -31,7 +33,9 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
   "channels": [                                  // 탭 순서 = 이 배열 순서
     { "id": "syuka", "name": "슈카", "kind": "youtube",
       "source": "UCsJ6RuBiTVWRX156FVbeaGg", "handle": "@syukaworld", "note": "경제·시사" },
-    { "id": "ai-tech", "name": "AI·테크", "kind": "x", "note": "X 실시간 반응" }
+    { "id": "ai-tech", "name": "AI·테크", "kind": "news",
+      "note": "모델·제품·인프라 기사", "query": "인공지능 테크" },
+    { "id": "startup", "name": "창업", "kind": "news", "note": "스타트업·투자 기사", "query": "스타트업 투자" }
   ],
   "episodes": [                                  // briefingDate 내림차순
     {
@@ -71,13 +75,17 @@ manifest.webmanifest    홈 화면 추가용 매니페스트
 
 ### 규칙
 
-- `channel`은 `channels[].id` 중 하나여야 합니다. `kind`가 `youtube`면 퀴즈·메모 탭이 붙고, `x`면 카드만 나옵니다.
+- `channel`은 `channels[].id` 중 하나여야 합니다. `kind`는 `youtube`(영상) 또는 `news`(기사)이고,
+  둘 다 읽기·퀴즈·생각해 보기 탭을 쓰며 에피소드에 담긴 만큼만 탭이 나옵니다. `channels[].query`는
+  그날 소식이 없을 때 "관련 기사 더 보기" 링크로 쓰입니다.
 - `briefingDate`는 날짜 바에서 선택하는 날, `date`는 원본 게시일입니다. `briefingDate`가 없으면 `date`로 채웁니다.
 - 같은 `id`가 다시 들어오면 덮어씁니다. 배열 순서는 `briefingDate`·`date` 내림차순으로 유지합니다.
-- `quizzes`·`reflections`가 없으면 해당 탭에 안내 문구만 나옵니다. 한 채널이라도 콘텐츠가 없는 날은 빈 상태가 표시됩니다.
+- `quizzes`·`reflections`가 없으면 그 탭은 나타나지 않습니다. 한 채널이라도 콘텐츠가 없는 날은 빈 상태가 표시됩니다.
 - 문체: 본문·퀴즈 해설·생각해 볼 질문은 **친근한 존댓말(해요체)**로 씁니다. 신문체(`~한다`, `~보여 준다`)는 쓰지 않습니다.
 - `body`·`title`·`pullQuote`·`footnote`·퀴즈 `explanation`의 `**구절**`은 굵은 글씨로 렌더링됩니다(HTML은 먼저 이스케이프하므로 안전).
 - `cards[].tags`는 카드 하단 키워드 알약으로 그려집니다. 3~4개, 짧은 말로(18자 이내, 최대 6개까지 검증 통과).
+- `cards[].sources`는 `author`(기사면 매체명, X면 핸들)와 `url`, `time`을 받습니다. `x.com`·`twitter.com` 링크는 `X` 태그,
+  나머지는 `기사` 태그로 표시됩니다.
 - 사용자 데이터(읽던 위치, 퀴즈 점수, 메모)는 저장소에 남지 않고 브라우저 `localStorage`에만 저장됩니다.
   키 접두사 `syuka.v1` — `syuka.v1.pos.{episodeId}`, `syuka.v1.quiz.{episodeId}`, `syuka.v1.note.{episodeId}.{질문 id}`.
 
@@ -99,7 +107,7 @@ git add data/episodes.json && git commit -m "briefing: 2026-11-16 (syuka, ai-tec
 
 GitHub Pages, `main` 브랜치 루트(`/`)에서 서빙. `.nojekyll`이 있어 정적 파일이 그대로 올라갑니다.
 push 후 보통 20~60초 안에 반영됩니다(첫 배포는 몇 분 걸릴 수 있음).
-`assets/style.css`·`assets/app.js`를 고쳤을 때는 `index.html`의 `?v=20261115c` 값을 함께 올리면
+`assets/style.css`·`assets/app.js`를 고쳤을 때는 `index.html`의 `?v=20261128` 값을 함께 올리면
 브라우저·CDN 캐시(10분)를 기다리지 않고 바로 새 파일이 내려갑니다.
 
 ```bash
